@@ -62,6 +62,7 @@ MODE="unified"
 STAGE_TARGET=""
 PUSH=false
 WHISPER_FFMPEG="${WHISPER_FFMPEG:-yes}"
+INCLUDE_IK_LLAMA="${INCLUDE_IK_LLAMA:-true}"
 
 # Platform to build for. Empty means the host's own architecture, which is what
 # a local build wants; CI sets it explicitly and schedules the job on a runner
@@ -135,6 +136,7 @@ for arg in "$@"; do
             echo "  SD_REF               Pin stable-diffusion.cpp to a commit, tag, or branch"
             echo "  AUDIO_REF            Pin audio.cpp to a commit, tag, or branch"
             echo "  IK_LLAMA_REF         Pin ik_llama.cpp to a commit, tag, or branch"
+            echo "  INCLUDE_IK_LLAMA     Include ik_llama.cpp in the image (default: true)"
             echo "  LS_VERSION           Override llama-swap version (e.g., '170' or 'latest')"
             echo "  WHISPER_FFMPEG       Enable whisper.cpp FFmpeg support (default: yes)"
             echo "  CMAKE_CUDA_ARCHITECTURES  CUDA compute capabilities to compile natively"
@@ -309,12 +311,14 @@ get_latest_hash() {
     git ls-remote "${1}" HEAD 2>/dev/null | head -1 | cut -f1
 }
 
-# Projects built for this backend. Every project currently builds on every
-# backend; this stays a function rather than a plain reference to
-# ALL_PROJECTS so a future backend-specific project has one place to skip.
+# Projects built for this backend. Optional projects stay in ALL_PROJECTS so
+# explicit --stage validation and upstream defaults remain intact.
 backend_projects() {
     local project
     for project in "${ALL_PROJECTS[@]}"; do
+        if [[ "${project}" == "ik-llama" && "${INCLUDE_IK_LLAMA}" != "true" ]]; then
+            continue
+        fi
         echo "${project}"
     done
 }
@@ -616,6 +620,11 @@ build_project() {
 }
 
 build_runtime() {
+    local ik_llama_version="${IK_LLAMA_HASH}"
+    if [[ "${INCLUDE_IK_LLAMA}" != "true" ]]; then
+        ik_llama_version="not included"
+    fi
+
     local args=(
         --build-arg "BACKEND=${BACKEND}"
         --build-arg "BUILDER_BASE=${BASE_TAG}"
@@ -625,7 +634,7 @@ build_runtime() {
         --build-arg "WHISPER_COMMIT_HASH=${WHISPER_HASH}"
         --build-arg "SD_COMMIT_HASH=${SD_HASH}"
         --build-arg "AUDIO_COMMIT_HASH=${AUDIO_HASH}"
-        --build-arg "IK_LLAMA_COMMIT_HASH=${IK_LLAMA_HASH}"
+        --build-arg "IK_LLAMA_COMMIT_HASH=${ik_llama_version}"
         --build-arg "CUDA_VERSION=${CUDA_VERSION}"
         --build-arg "CMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES}"
         --build-arg "VARIANT=${VARIANT}"
@@ -741,7 +750,10 @@ echo "Verifying build artifacts..."
 echo "=========================================="
 echo ""
 
-EXPECTED_BINARIES=(llama-server llama-cli llama-bench whisper-server whisper-cli sd-server sd-cli audiocpp_server audiocpp_cli llama-swap vllm-wrapper ik-llama-server)
+EXPECTED_BINARIES=(llama-server llama-cli llama-bench whisper-server whisper-cli sd-server sd-cli audiocpp_server audiocpp_cli llama-swap vllm-wrapper)
+if [[ "${INCLUDE_IK_LLAMA}" == "true" ]]; then
+    EXPECTED_BINARIES+=(ik-llama-server)
+fi
 
 MISSING_BINARIES=()
 for binary in "${EXPECTED_BINARIES[@]}"; do
@@ -761,7 +773,7 @@ if [[ ${#MISSING_BINARIES[@]} -gt 0 ]]; then
     exit 1
 fi
 
-VERIFIED_LIST="llama-server, llama-cli, llama-bench, whisper-server, whisper-cli, sd-server, sd-cli, audiocpp_server, audiocpp_cli, llama-swap, vllm-wrapper, ik-llama-server"
+VERIFIED_LIST="${EXPECTED_BINARIES[*]}"
 echo "All expected binaries verified: ${VERIFIED_LIST}"
 
 # audio.cpp must be a deployment build: the model_specs catalog is compiled into
@@ -870,7 +882,11 @@ echo "  llama.cpp:            ${LLAMA_HASH}"
 echo "  whisper.cpp:          ${WHISPER_HASH}"
 echo "  stable-diffusion.cpp: ${SD_HASH}"
 echo "  audio.cpp:            ${AUDIO_HASH}"
-echo "  ik_llama.cpp:         ${IK_LLAMA_HASH}"
+if [[ "${INCLUDE_IK_LLAMA}" == "true" ]]; then
+    echo "  ik_llama.cpp:         ${IK_LLAMA_HASH}"
+else
+    echo "  ik_llama.cpp:         not included"
+fi
 if [[ "$BACKEND" == "cuda" ]]; then
     echo "  CUDA version:         ${CUDA_VERSION}"
     echo "  CUDA architectures:   ${CMAKE_CUDA_ARCHITECTURES}"

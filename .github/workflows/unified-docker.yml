@@ -146,7 +146,7 @@ jobs:
             echo "build_vulkan=${build_vulkan}"
             echo "push_to_ghcr=${push}"
             echo 'cuda_projects=["whisper","sd","audio","llama","ik-llama"]'
-            echo 'vulkan_projects=["whisper","sd","audio","llama","ik-llama"]'
+            echo 'vulkan_projects=["whisper","sd","audio","llama"]'
             echo 'amd64_only=["linux/amd64"]'
             echo "cuda13_platforms=${cuda13_platforms}"
             # Resolved once so every platform's image and the manifest that

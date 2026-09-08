@@ -61,6 +61,7 @@ env:
   # shared Docker scripts stay configurable and minimizes upstream merge churn.
   LLAMA_REPO: https://github.com/halo-box/strix-llama.cpp.git
   ARTIFACT_REPO: ghcr.io/${{ github.repository }}-build
+  INCLUDE_IK_LLAMA: "false"
 
 # Every stage runs natively on a runner of the target architecture. Compiling
 # CUDA through QEMU is not practical for builds that already take hours, so the

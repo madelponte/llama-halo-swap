@@ -6,12 +6,14 @@ This fork publishes only the amd64 Vulkan unified image:
 ghcr.io/madelponte/llama-halo-swap:unified-vulkan
 ```
 
-It is equivalent to llama-swap's upstream `unified-vulkan` image, except its
+It is based on llama-swap's upstream `unified-vulkan` image, but its
 `llama-server`, `llama-cli`, `llama-tts`, and `llama-bench` binaries are built
 from the latest `master` commit of
 [`halo-box/strix-llama.cpp`](https://github.com/halo-box/strix-llama.cpp).
-The other unified-image tools (whisper.cpp, stable-diffusion.cpp, audio.cpp,
-ik_llama.cpp, and llama-swap) remain included.
+The other GPU-capable unified-image tools (whisper.cpp,
+stable-diffusion.cpp, audio.cpp, and llama-swap) remain included. ik_llama.cpp
+is intentionally omitted because this image targets Strix Halo Vulkan
+inference; skipping its CPU-oriented build saves CI time and registry space.
 
 The scheduled workflow resolves every moving ref to a commit before building,
 then publishes the image and its date-qualified tag. `/versions.txt` in the
@@ -30,6 +32,7 @@ remains reusable after upstream syncs. Select the Strix Halo source explicitly:
 
 ```bash
 LLAMA_REPO=https://github.com/halo-box/strix-llama.cpp.git \
+INCLUDE_IK_LLAMA=false \
   ./docker/unified/build-image.sh --vulkan
 ```
 
