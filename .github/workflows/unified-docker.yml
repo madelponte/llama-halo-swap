@@ -1,4 +1,4 @@
-name: Build Unified Docker Image
+name: Build Strix Halo Unified Vulkan Image
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       llama_cpp_ref:
-        description: "llama.cpp commit hash, tag, or branch"
+        description: "strix-llama.cpp commit hash, tag, or branch"
         required: false
         default: "master"
       whisper_ref:
@@ -30,21 +30,6 @@ on:
         description: "llama-swap version (e.g. v198, latest, main)"
         required: false
         default: "main"
-      build_cuda:
-        description: "Build CUDA 12 image (Pascal through Ada)"
-        type: boolean
-        required: false
-        default: true
-      build_cuda13:
-        description: "Build CUDA 13 image (Ampere through Blackwell)"
-        type: boolean
-        required: false
-        default: true
-      build_arm64:
-        description: "Include linux/arm64 in the CUDA 13 image (NVIDIA GB10 / DGX Spark)"
-        type: boolean
-        required: false
-        default: true
       build_vulkan:
         description: "Build Vulkan image"
         type: boolean
@@ -117,7 +102,7 @@ jobs:
       # Resolve every ref once, here. The build and assemble jobs are handed
       # full commit hashes, so a branch that moves mid-run cannot leave two
       # jobs building different revisions of the same project.
-      - name: Resolve upstream commits
+      - name: Resolve source commits
         id: refs
         env:
           LLAMA_REF: ${{ inputs.llama_cpp_ref || 'master' }}
@@ -128,20 +113,23 @@ jobs:
           LS_VERSION: ${{ inputs.llama_swap_version || 'main' }}
         run: |
           chmod +x docker/unified/build-image.sh
-          docker/unified/build-image.sh --cuda --resolve | tee -a "$GITHUB_OUTPUT"
+          LLAMA_REPO=https://github.com/halo-box/strix-llama.cpp.git \
+            docker/unified/build-image.sh --vulkan --resolve | tee -a "$GITHUB_OUTPUT"
 
       - name: Plan variants
         id: plan
         run: |
-          # schedule uses defaults (build all, push); workflow_dispatch respects inputs
+          # Fork customization: publish only the Vulkan image optimized by
+          # halo-box/strix-llama.cpp. Keep the upstream CUDA job definitions
+          # below untouched so regular upstream merges are less likely to
+          # conflict, but never include them in this fork's build plan.
+          build_cuda=false
+          build_cuda13=false
+          build_arm64=false
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            build_cuda=true; build_cuda13=true; build_vulkan=true
-            build_arm64=true; push=true
+            build_vulkan=true; push=true
           else
-            build_cuda="${{ inputs.build_cuda }}"
-            build_cuda13="${{ inputs.build_cuda13 }}"
             build_vulkan="${{ inputs.build_vulkan }}"
-            build_arm64="${{ inputs.build_arm64 }}"
             push="${{ inputs.push_to_ghcr }}"
           fi
 

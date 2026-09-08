@@ -129,6 +129,7 @@ for arg in "$@"; do
             echo "Environment variables:"
             echo "  DOCKER_IMAGE_TAG     Set custom image tag (default: llama-swap:unified-<variant>,"
             echo "                       e.g. llama-swap:unified-cuda13)"
+            echo "  LLAMA_REPO           Override the llama.cpp git repository URL"
             echo "  LLAMA_REF            Pin llama.cpp to a commit, tag, or branch"
             echo "  WHISPER_REF          Pin whisper.cpp to a commit, tag, or branch"
             echo "  SD_REF               Pin stable-diffusion.cpp to a commit, tag, or branch"
@@ -255,8 +256,9 @@ DOCKER_IMAGE_TAG="${DOCKER_IMAGE_TAG:-llama-swap:unified-${VARIANT}}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Git repository URLs
-LLAMA_REPO="https://github.com/ggml-org/llama.cpp.git"
+# Git repository URLs. LLAMA_REPO is configurable so a downstream image can
+# build a llama.cpp fork without replacing the rest of the unified pipeline.
+LLAMA_REPO="${LLAMA_REPO:-https://github.com/ggml-org/llama.cpp.git}"
 WHISPER_REPO="https://github.com/ggml-org/whisper.cpp.git"
 SD_REPO="https://github.com/leejet/stable-diffusion.cpp.git"
 AUDIO_REPO="https://github.com/0xShug0/audio.cpp.git"
@@ -369,6 +371,9 @@ artifact_tag() {
         cat "${SCRIPT_DIR}/${project}.Dockerfile"
         cat "${SCRIPT_DIR}/install-${project}.sh"
         echo "base=$(base_tag)"
+        if [[ "${project}" == "llama" ]]; then
+            echo "LLAMA_REPO=${LLAMA_REPO}"
+        fi
         echo "WHISPER_FFMPEG=${WHISPER_FFMPEG}"
     } | sha256sum | cut -c1-8 )"
     echo "${ARTIFACT_REPO}:art-${project}-${VARIANT}${ARCH_TAG}-${commit:0:12}-${recipe}"
@@ -603,6 +608,7 @@ build_project() {
         --build-arg "SD_COMMIT_HASH=${SD_HASH}" \
         --build-arg "AUDIO_COMMIT_HASH=${AUDIO_HASH}" \
         --build-arg "LLAMA_COMMIT_HASH=${LLAMA_HASH}" \
+        --build-arg "LLAMA_REPO=${LLAMA_REPO}" \
         --build-arg "IK_LLAMA_COMMIT_HASH=${IK_LLAMA_HASH}" \
         "${PLATFORM_ARGS[@]}" \
         "${CACHE_ARGS[@]}" \
@@ -614,6 +620,7 @@ build_runtime() {
         --build-arg "BACKEND=${BACKEND}"
         --build-arg "BUILDER_BASE=${BASE_TAG}"
         --build-arg "LS_VERSION=${LS_HASH}"
+        --build-arg "LLAMA_REPOSITORY=${LLAMA_REPO}"
         --build-arg "LLAMA_COMMIT_HASH=${LLAMA_HASH}"
         --build-arg "WHISPER_COMMIT_HASH=${WHISPER_HASH}"
         --build-arg "SD_COMMIT_HASH=${SD_HASH}"

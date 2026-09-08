@@ -56,6 +56,12 @@ permissions:
   contents: read
   packages: write
 
+env:
+  # Fork-specific source and registry. Keeping these overrides here lets the
+  # shared Docker scripts stay configurable and minimizes upstream merge churn.
+  LLAMA_REPO: https://github.com/halo-box/strix-llama.cpp.git
+  ARTIFACT_REPO: ghcr.io/${{ github.repository }}-build
+
 # Every stage runs natively on a runner of the target architecture. Compiling
 # CUDA through QEMU is not practical for builds that already take hours, so the
 # platform selects the runner rather than a cross-build. The selection is
@@ -204,7 +210,7 @@ jobs:
           AUDIO_REF: ${{ inputs.audio_hash }}
           IK_LLAMA_REF: ${{ inputs.ik_llama_hash }}
           LS_VERSION: ${{ inputs.ls_hash }}
-          DOCKER_IMAGE_TAG: ghcr.io/mostlygeek/llama-swap:unified-${{ inputs.variant }}
+          DOCKER_IMAGE_TAG: ghcr.io/${{ github.repository }}:unified-${{ inputs.variant }}
           # When running under act, use the local builder that has warm ccache.
           # On GitHub Actions, BUILDX_BUILDER is unset so docker uses the builder
           # created by setup-buildx-action above.

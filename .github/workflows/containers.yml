@@ -31,6 +31,10 @@ permissions:
 
 jobs:
   build-and-push:
+    # This fork publishes its Strix Halo image through unified-docker.yml.
+    # Keep the legacy upstream-image pipeline available when syncing upstream,
+    # but do not spend runner time or registry storage on it in forks.
+    if: github.repository == 'mostlygeek/llama-swap'
     runs-on: ubuntu-latest
     strategy:
       matrix:

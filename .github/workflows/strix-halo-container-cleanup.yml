@@ -1,0 +1,53 @@
+name: Clean Up Strix Halo Container Images
+
+on:
+  # The image build starts daily at 05:37 UTC. Run cleanup weekly and well
+  # afterward so it normally does not overlap a cold build.
+  schedule:
+    - cron: "17 14 * * 0"
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Log what would be deleted without deleting it"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      # Preserve the moving user-facing and per-architecture tags. Date tags
+      # older than 60 days and old untagged platform images are disposable.
+      # This action understands OCI manifest children and will not leave a
+      # retained manifest pointing at a deleted platform image.
+      - name: Delete old published images
+        uses: dataaxiom/ghcr-cleanup-action@cd0cdb900b5dbf3a6f2cc869f0dbb0b8211f50c4 # v1.0.16
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          package: ${{ github.event.repository.name }}
+          delete-tags: "unified-vulkan-20??-??-??,unified-vulkan-rootless-20??-??-??"
+          exclude-tags: "unified-vulkan,unified-vulkan-rootless,unified-vulkan-amd64,unified-vulkan-amd64-rootless"
+          delete-untagged: true
+          older-than: "60 days"
+          validate: true
+          dry-run: ${{ inputs.dry_run || false }}
+
+      # Builder bases and per-project artifacts use immutable content-addressed
+      # tags. Once they are 60 days old they can be removed safely: released
+      # runtime images already contain the copied files, and a future build
+      # recreates any artifact it needs after cleanup.
+      - name: Delete old build artifacts
+        uses: dataaxiom/ghcr-cleanup-action@cd0cdb900b5dbf3a6f2cc869f0dbb0b8211f50c4 # v1.0.16
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          package: ${{ github.event.repository.name }}-build
+          delete-tags: "*"
+          delete-untagged: true
+          older-than: "60 days"
+          validate: true
+          dry-run: ${{ inputs.dry_run || false }}

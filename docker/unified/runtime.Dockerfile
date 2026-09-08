@@ -92,6 +92,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 FROM runtime-${BACKEND} AS runtime
 
 ARG BACKEND=cuda
+ARG LLAMA_REPOSITORY=https://github.com/ggml-org/llama.cpp.git
 ARG LLAMA_COMMIT_HASH=unknown
 ARG WHISPER_COMMIT_HASH=unknown
 ARG SD_COMMIT_HASH=unknown
@@ -171,7 +172,8 @@ RUN sed -i "s/__BACKEND__/${BACKEND}/" /etc/llama-swap/audiocpp-server.example.j
     chown -R ${RUN_UID}:${RUN_UID} /etc/llama-swap
 
 # Version tracking
-RUN echo "llama.cpp: ${LLAMA_COMMIT_HASH}" > /versions.txt && \
+RUN echo "llama.cpp repository: ${LLAMA_REPOSITORY}" > /versions.txt && \
+    echo "llama.cpp: ${LLAMA_COMMIT_HASH}" >> /versions.txt && \
     echo "whisper.cpp: ${WHISPER_COMMIT_HASH}" >> /versions.txt && \
     echo "stable-diffusion.cpp: ${SD_COMMIT_HASH}" >> /versions.txt && \
     echo "ik_llama.cpp: ${IK_LLAMA_COMMIT_HASH}" >> /versions.txt && \
