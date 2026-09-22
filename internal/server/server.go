@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mostlygeek/llama-swap/internal/capcompat"
 	"github.com/mostlygeek/llama-swap/internal/chain"
 	"github.com/mostlygeek/llama-swap/internal/config"
 	"github.com/mostlygeek/llama-swap/internal/docagent"
@@ -46,6 +47,17 @@ type Server struct {
 	// across the Server instances a hot config reload creates. A nil value
 	// disables the endpoint; Docs methods are nil-receiver safe.
 	reference *docagent.Docs
+
+	// capcompat holds model capabilities discovered from upstream servers.
+	// It is refreshed when a model becomes ready and read by /v1/models, so
+	// an unloaded model still advertises what it can do. A nil value disables
+	// discovery; Service methods are nil-receiver safe.
+	capcompat *capcompat.Service
+
+	// capcompatCancel unsubscribes the process-state listener that drives
+	// discovery. The event dispatcher is process-wide, so a hot config reload
+	// would otherwise leave the retired Server probing alongside the new one.
+	capcompatCancel context.CancelFunc
 
 	// tools is the MCP tool surface served at /api/mcp. Providers are
 	// aggregated here rather than enumerated in the handler, so a future
@@ -238,6 +250,9 @@ func New(cfg config.Config, muxlog *logmon.Monitor, proxylog *logmon.Monitor, up
 		shutdownCtx:   shutdownCtx,
 		shutdownFn:    shutdownFn,
 	}
+	s.capcompat = capcompat.New(st.Cache(), proxylog)
+	s.capcompatCancel = event.On(s.onProcessStateChange)
+
 	// SysProvider is constructed here because this is where perf and hardware
 	// are in scope; wiring those in later is a change to internal/mcptools.
 	tools, err := mcptools.New(
@@ -365,8 +380,8 @@ func (s *Server) routes() {
 	mux.Handle("/upstream/{upstreamPath...}", upstreamChain.ThenFunc(s.handleUpstream))
 
 	// ComfyUI compatibility passthrough. This uses the fixed comfyui_auto model,
-	// whose compatibility settings are applied while loading config. Only the
-	// root path may start an unloaded model.
+	// whose compatibility settings are applied while loading config. A GET to
+	// /ws may not start an unloaded model.
 	mux.Handle("/comfyui", apiChain.ThenFunc(handleComfyUIRedirect))
 	mux.Handle("/comfyui/{comfyPath...}", apiChain.ThenFunc(s.handleComfyUI))
 
@@ -392,7 +407,7 @@ func (s *Server) routes() {
 	mux.Handle("/api/mcp", apiChain.ThenFunc(s.handleAPIMCP))
 
 	s.mux = mux
-	s.handler = chain.New(CreateRequestLogMiddleware(s.proxylog), CreateCORSMiddleware()).Then(mux)
+	s.handler = chain.New(CreateRequestLogMiddleware(s.proxylog), CreateCORSMiddleware(s.cfg)).Then(mux)
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -504,6 +519,9 @@ func (s *Server) Shutdown(timeout time.Duration) error {
 		return nil
 	}
 	s.shutdownFn()
+	if s.capcompatCancel != nil {
+		s.capcompatCancel()
+	}
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex

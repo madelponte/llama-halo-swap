@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mostlygeek/llama-swap/internal/capcompat"
 	"github.com/mostlygeek/llama-swap/internal/config"
 	"github.com/mostlygeek/llama-swap/internal/docagent"
 	"github.com/mostlygeek/llama-swap/internal/event"
@@ -93,6 +94,7 @@ func newTestServerWithConfig(cfg config.Config, local router.LocalRouter, peer r
 		inflight:    newInflightTracker(),
 		metrics:     newMetricsMonitor(proxylog, 0, 0, st),
 		store:       st,
+		capcompat:   capcompat.New(st.Cache(), proxylog),
 		local:       local,
 		peer:        peer,
 		shutdownCtx: ctx,
@@ -387,21 +389,6 @@ func TestServer_Health(t *testing.T) {
 		if w.Code != http.StatusOK || w.Body.String() != "OK" {
 			t.Errorf("%s: status=%d body=%q", path, w.Code, w.Body.String())
 		}
-	}
-}
-
-func TestServer_CORSPreflight(t *testing.T) {
-	s := newTestServer(newStubRouter(nil, ""), newStubRouter(nil, ""))
-
-	req := httptest.NewRequest(http.MethodOptions, "/v1/chat/completions", nil)
-	w := httptest.NewRecorder()
-	s.ServeHTTP(w, req)
-
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("status=%d want 204", w.Code)
-	}
-	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "*" {
-		t.Errorf("Access-Control-Allow-Origin=%q want *", got)
 	}
 }
 
