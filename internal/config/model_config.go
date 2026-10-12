@@ -13,6 +13,9 @@ const (
 
 	// ComfyUIModelID identifies the model used by the /comfyui endpoint.
 	ComfyUIModelID = "comfyui_auto"
+
+	// AudioCppModelID identifies the model used by the /audiocpp endpoint.
+	AudioCppModelID = "audiocpp_auto"
 )
 
 var validModalities = map[string]struct{}{
@@ -20,6 +23,16 @@ var validModalities = map[string]struct{}{
 	"audio": {},
 	"image": {},
 	"video": {},
+}
+
+// validOutModalities adds "decisions", the only output of llama.cpp decision
+// models, which answer /v1/systemone and generate no text.
+var validOutModalities = map[string]struct{}{
+	"text":      {},
+	"audio":     {},
+	"image":     {},
+	"video":     {},
+	"decisions": {},
 }
 
 // ModelCapConfig defines what modalities and features a model supports.
@@ -83,8 +96,8 @@ func (c ModelCapConfig) Validate() error {
 		}
 	}
 	for _, m := range c.Out {
-		if _, ok := validModalities[m]; !ok {
-			return fmt.Errorf("capabilities.out: invalid modality %q, must be one of: text, audio, image, video", m)
+		if _, ok := validOutModalities[m]; !ok {
+			return fmt.Errorf("capabilities.out: invalid modality %q, must be one of: text, audio, image, video, decisions", m)
 		}
 	}
 	if c.Context < 0 {
