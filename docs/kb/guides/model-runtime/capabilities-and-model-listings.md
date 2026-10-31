@@ -2,9 +2,9 @@
 title: Model capabilities and model listings
 summary: Advertise images, tools and context length in /v1/models, automatically or by hand.
 category: guides
-tags: [capabilities, voices, speech, models, tools, vision, context, autodetect, llama-server, vllm, halogen, playground, decisions]
-config_keys: [models.*.capabilities, models.*.capabilities.disableAuto, models.*.capabilities.voices, store.path]
-updated: 2026-10-10
+tags: [capabilities, voices, speech, models, tools, vision, context, autodetect, embeddings, reranker, llama-server, vllm, halogen, playground, decisions]
+config_keys: [models.*.capabilities, models.*.capabilities.disableAuto, models.*.capabilities.voices, models.*.capabilities.embeddings, models.*.capabilities.reranker, store.path]
+updated: 2026-10-28
 ---
 
 # Model capabilities and model listings
@@ -49,6 +49,7 @@ What each server can report:
 | tools | yes, from the chat template | no | yes |
 | decision model output | yes, from `/v1/models` | no | no |
 | reranker | no | no | no |
+| embeddings | no | no | no |
 
 llama-server is read from `/props`, and halogen-flash-server from its
 `/health`, which that project documents as the authoritative report of what
@@ -64,7 +65,9 @@ says.
 
 vLLM is the thin one. Nothing it serves says whether it was started with
 `--enable-auto-tool-choice`, or whether the model takes images, so set those
-by hand on vLLM models.
+by hand on vLLM models. Other servers whose `/v1/models` lists a context
+length, such as Gufo and yamz (`max_context`), are read the same way: context
+length only.
 
 llama-swap picks the right reader from the `owned_by` field in the server's
 own `/v1/models`: `llamacpp`, `vllm` or `halogen`. To check what a server
@@ -96,6 +99,35 @@ models:
 
 Set only what the model really supports. A false claim makes clients send
 requests that fail or get ignored.
+
+## Marking embedding and rerank models
+
+Embedding servers have nothing to probe: no endpoint tells an embedding
+model from a chat model without sending a real request, so discovery
+never fills this in. The same is true for a reranker. Set the flag by
+hand on both:
+
+```yaml
+models:
+  gte-modernbert:
+    cmd: llama-server -m gte-modernbert-F16.gguf --embedding --pooling cls --port ${PORT}
+    capabilities:
+      embeddings: true
+      context: 8192
+  gte-reranker:
+    cmd: llama-server -m gte-reranker-F16.gguf --embedding --pooling rank --port ${PORT}
+    capabilities:
+      reranker: true
+      context: 8192
+```
+
+The flags only change listing metadata: `/v1/models` reports
+`capabilities.embeddings: true` or `capabilities.reranker: true` so
+clients can tell these models apart from chat models, filter for them,
+and show a badge. Neither flag starts, stops or reroutes anything; what
+the server actually serves is decided by its command line. Without the
+flag an embedding model that reports `text -> text` from `/props` is
+indistinguishable from a chat model in the listing.
 
 ## Turning discovery off
 
