@@ -9,12 +9,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/mostlygeek/llama-swap/internal/config"
+	"github.com/mostlygeek/llama-swap/internal/hint"
 	"github.com/mostlygeek/llama-swap/internal/logmon"
 )
 
@@ -127,7 +129,7 @@ func TestCapcompat_DetectLlamaServer(t *testing.T) {
 	info, err := Detect(context.Background(), up.client(t), "model-a")
 	require.NoError(t, err)
 
-	assert.Equal(t, "llama-server", info.Upstream)
+	assert.Equal(t, hint.LlamaServer, info.Upstream)
 	assert.Equal(t, []string{"text"}, info.Capabilities.In)
 	assert.Equal(t, []string{"text"}, info.Capabilities.Out)
 	assert.True(t, info.Capabilities.Tools)
@@ -169,6 +171,46 @@ func TestCapcompat_DetectLlamaServerDecisionModel(t *testing.T) {
 	assert.Equal(t, 16384, info.Capabilities.Context)
 }
 
+// A speech to speech model (LFM3 Audio on build b12063) accepts audio, which
+// /props reports, and also speaks, which only the listing's
+// output_modalities says. The capture's chat_template is elided and its model
+// paths shortened.
+func TestCapcompat_DetectLlamaServerAudioOutput(t *testing.T) {
+	up := newUpstream(t, map[string][]byte{
+		"/v1/models": fixture(t, "llama-server", "v1_models_capture_lfm_audio.json"),
+		"/props":     fixture(t, "llama-server", "props_capture_lfm_audio.json"),
+	})
+
+	info, err := Detect(context.Background(), up.client(t), "liquidfm-2B")
+	require.NoError(t, err)
+
+	assert.Equal(t, hint.LlamaServer, info.Upstream)
+	assert.Equal(t, []string{"text", "audio"}, info.Capabilities.In)
+	assert.Equal(t, []string{"text", "audio"}, info.Capabilities.Out)
+	assert.True(t, info.Capabilities.Tools, "text is still an output, so tools stay")
+	assert.Equal(t, 128000, info.Capabilities.Context)
+	require.NoError(t, info.Capabilities.Validate())
+}
+
+func TestCapcompat_DetectLlamaServerAudioOnlyOutput(t *testing.T) {
+	// A speech-only model reports output_modalities ["audio"]. It must not be
+	// credited with text, or with tools, which need text out.
+	listing := regexp.MustCompile(`"output_modalities": \[[^\]]*\]`).ReplaceAll(
+		fixture(t, "llama-server", "v1_models_capture_lfm_audio.json"),
+		[]byte(`"output_modalities": ["audio"]`))
+	up := newUpstream(t, map[string][]byte{
+		"/v1/models": listing,
+		"/props":     fixture(t, "llama-server", "props_capture_lfm_audio.json"),
+	})
+
+	info, err := Detect(context.Background(), up.client(t), "liquidfm-2B")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"audio"}, info.Capabilities.Out)
+	assert.False(t, info.Capabilities.Tools)
+	require.NoError(t, info.Capabilities.Validate())
+}
+
 func TestCapcompat_DetectLlamaServerIgnoresUnmappedModalities(t *testing.T) {
 	up := newUpstream(t, map[string][]byte{
 		"/v1/models": fixture(t, "llama-server", "v1_models.json"),
@@ -200,7 +242,7 @@ func TestCapcompat_DetectLlamaServerCapture(t *testing.T) {
 	info, err := Detect(context.Background(), up.client(t), "gemma")
 	require.NoError(t, err)
 
-	assert.Equal(t, "llama-server", info.Upstream)
+	assert.Equal(t, hint.LlamaServer, info.Upstream)
 	assert.Equal(t, []string{"text"}, info.Capabilities.In)
 	assert.Equal(t, 220160, info.Capabilities.Context, "context comes from /props")
 }
@@ -276,7 +318,7 @@ func TestCapcompat_DetectLlamaServerNewBuildProps(t *testing.T) {
 	info, err := Detect(context.Background(), up.client(t), "model-a")
 	require.NoError(t, err)
 
-	assert.Equal(t, "llama-server", info.Upstream)
+	assert.Equal(t, hint.LlamaServer, info.Upstream)
 	assert.Equal(t, []string{"text", "image", "audio", "video"}, info.Capabilities.In)
 	assert.Equal(t, []string{"text"}, info.Capabilities.Out)
 	assert.True(t, info.Capabilities.Tools, "caps report supports_tools and supports_tool_calls")
@@ -305,7 +347,7 @@ func TestCapcompat_DetectLlamaServerInvalidPropsJSON(t *testing.T) {
 			info, err := Detect(context.Background(), up.clientWithLogger(t, log), "model-a")
 			require.NoError(t, err)
 
-			assert.Equal(t, "llama-server", info.Upstream)
+			assert.Equal(t, hint.LlamaServer, info.Upstream)
 			assert.Equal(t, []string{"text"}, info.Capabilities.In)
 			assert.Equal(t, []string{"text"}, info.Capabilities.Out)
 			assert.False(t, info.Capabilities.Tools)
@@ -380,7 +422,7 @@ func TestCapcompat_DetectVLLM(t *testing.T) {
 	info, err := Detect(context.Background(), up.client(t), "meta-llama/Llama-3.1-8B-Instruct")
 	require.NoError(t, err)
 
-	assert.Equal(t, "default", info.Upstream)
+	assert.Equal(t, hint.VLLM, info.Upstream)
 	assert.Equal(t, 131072, info.Capabilities.Context)
 	assert.Equal(t, []string{"text"}, info.Capabilities.In)
 	assert.Equal(t, []string{"text"}, info.Capabilities.Out)
@@ -400,7 +442,7 @@ func TestCapcompat_DetectVLLMCapture(t *testing.T) {
 		info, err := Detect(context.Background(), up.client(t), "qwen3-4b-vllm")
 		require.NoError(t, err)
 
-		assert.Equal(t, "default", info.Upstream)
+		assert.Equal(t, hint.VLLM, info.Upstream)
 		assert.Equal(t, 40960, info.Capabilities.Context)
 		assert.Equal(t, []string{"text"}, info.Capabilities.In)
 		assert.Equal(t, []string{"text"}, info.Capabilities.Out)
@@ -455,12 +497,42 @@ func TestCapcompat_DetectGufo(t *testing.T) {
 	info, err := Detect(context.Background(), up.client(t), "qwen3.8-flash-next-gufo")
 	require.NoError(t, err)
 
-	assert.Equal(t, "default", info.Upstream)
+	assert.Equal(t, hint.OpenAICompatible, info.Upstream)
 	assert.Equal(t, 262144, info.Capabilities.Context)
 	assert.Equal(t, []string{"text"}, info.Capabilities.In)
 	assert.Equal(t, []string{"text"}, info.Capabilities.Out)
 	assert.False(t, info.Capabilities.Tools, "gufo exposes nothing about tool support in /v1/models")
 	assert.Equal(t, 0, up.hits["/props"], "gufo has no /props to read")
+	require.NoError(t, info.Capabilities.Validate())
+}
+
+func TestCapcompat_DetectRadiance(t *testing.T) {
+	up := newUpstream(t, map[string][]byte{
+		"/v1/models": fixture(t, "radiance", "v1_models.json"),
+	})
+
+	info, err := Detect(context.Background(), up.client(t), "qwen35")
+	require.NoError(t, err)
+
+	assert.Equal(t, hint.Radiance, info.Upstream)
+	assert.Equal(t, 200000, info.Capabilities.Context)
+	assert.Equal(t, 0, up.hits["/props"], "radiance has no /props to read")
+	require.NoError(t, info.Capabilities.Validate())
+}
+
+func TestCapcompat_DetectHipfire(t *testing.T) {
+	up := newUpstream(t, map[string][]byte{
+		"/v1/models": fixture(t, "hipfire", "v1_models.json"),
+	})
+
+	info, err := Detect(context.Background(), up.client(t), "deepseek-v4-flash-mtp.mq2lloyd")
+	require.NoError(t, err)
+	assert.Equal(t, hint.Hipfire, info.Upstream)
+	assert.Zero(t, info.Capabilities.Context, "Hipfire does not publish the loaded context")
+	assert.Equal(t, []string{"text"}, info.Capabilities.In)
+	assert.Equal(t, []string{"text"}, info.Capabilities.Out)
+	assert.False(t, info.Capabilities.Tools, "tool support is not advertised by the listing")
+	assert.Len(t, up.hits, 1, "only /v1/models is needed")
 	require.NoError(t, info.Capabilities.Validate())
 }
 
@@ -472,7 +544,7 @@ func TestCapcompat_DetectYamz(t *testing.T) {
 	info, err := Detect(context.Background(), up.client(t), "qwen-3.8-next-kyojin")
 	require.NoError(t, err)
 
-	assert.Equal(t, "default", info.Upstream)
+	assert.Equal(t, hint.Kyojin, info.Upstream, "kyojin lists its models as owned_by yamz")
 	assert.Equal(t, 262144, info.Capabilities.Context)
 	assert.Equal(t, []string{"text"}, info.Capabilities.In)
 	assert.Equal(t, []string{"text"}, info.Capabilities.Out)
@@ -489,7 +561,7 @@ func TestCapcompat_DetectHalogen(t *testing.T) {
 	info, err := Detect(context.Background(), up.client(t), "halogen-qwen3.8-flash-next")
 	require.NoError(t, err)
 
-	assert.Equal(t, "halogen", info.Upstream)
+	assert.Equal(t, hint.Halogen, info.Upstream)
 	assert.Equal(t, []string{"text", "image"}, info.Capabilities.In, "this build has a vision tower")
 	assert.Equal(t, []string{"text"}, info.Capabilities.Out)
 	assert.True(t, info.Capabilities.Tools)

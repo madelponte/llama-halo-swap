@@ -1,5 +1,51 @@
 # Changelog
 
+## v270 (Nov 3, 2026)
+
+Ohh, support for the v1/realtime API with LFM3 voice chat in the Playground!
+The Help agent has been updated with a guide on how to quickly get it set up
+and working.
+
+Also in this release are a few compatbility and quality improvements.
+Thanks to @noctrex, @SriRamanujam, and @ltjax for the contributions.
+
+- [PR #1278](https://github.com/mostlygeek/llama-swap/pull/1278) Feat/sidebar category submenus: adds category submenus to the left sidebar menu, mirroring the capability-derived categories recently added to the Models list by [@noctrex](https://github.com/noctrex) and [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1288](https://github.com/mostlygeek/llama-swap/pull/1288) Configurable token rate sources: adds hints, docs and usage extraction for hipfire so token/s stats are captured correctly when running hipfire behind llama-swap, as part of the pluggable per-upstream usage parsing by [@ltjax](https://github.com/ltjax)
+- [PR #1291](https://github.com/mostlygeek/llama-swap/pull/1291) cmd/kubeswap: Support defining annotations and service accounts: allows defining annotations on generated deployments and pods (rejecting the reserved `kubeswap.io/model-id` key) and setting `.spec.template.spec.serviceAccountName` on the Deployment, without managing the ServiceAccount itself by [@SriRamanujam](https://github.com/SriRamanujam)
+- [PR #1297](https://github.com/mostlygeek/llama-swap/pull/1297) fix(logmon): stop memory accumulating across config reloads: closes a process's dedicated log monitor when `ProcessCommand.run` returns so discarded router generations no longer leak memory, because each monitor's surviving broadcast goroutine kept its 100 KiB history buffer reachable after a hot reload (129 MiB retained after 100 router replacements in testing, now ~0) by [@junmo-kim](https://github.com/junmo-kim)
+- [PR #1298](https://github.com/mostlygeek/llama-swap/pull/1298) makefile: use .stamp for UI dependency checks: uses a `.stamp` file to detect UI dependency changes, fixing a build error after pulling the latest version when UI dependencies changed by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1299](https://github.com/mostlygeek/llama-swap/pull/1299) internal/server: add /v1/realtime proxying and a Realtime playground: proxies OpenAI Realtime API style websockets to the upstream named by the `?model=` query and adds a Playground > Realtime tab for speech-to-speech models like LFM3 Audio through llama-server (push-to-talk or hands-free voice detection, streamed playback, replay/download per turn), records each session as one Activity row with reply, token, decode-rate and audio-second metrics, detects audio output from `/v1/models` `output_modalities`, and adds a KB guide with llama-server configuration examples by [@mostlygeek](https://github.com/mostlygeek)
+
+## v269 (Oct 31, 2026)
+
+Happy Halloween!
+
+Lots of small and big treats in this release.
+
+- captures can now be persisted to disk and not lost on restart.
+- the metrics capture backend has been refactored to make it easy
+  to add support for new inference servers.
+- the UI can show models sorted by categories, great if you have
+  many different types configured!  
+- metrics can be exported as a PNG to make sharing easier.
+- add support for the embedding model capability
+- small bug and UI improvements
+
+Details below:
+
+- [PR #1274](https://github.com/mostlygeek/llama-swap/pull/1274) go.mod,ui/package-lock.json: dependency updates: picks up security updates for node and moves `shirou/gopsutil` back to the main upstream repository by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1275](https://github.com/mostlygeek/llama-swap/pull/1275) feat(config): add embeddings capability flag: adds `capabilities.embeddings`, mirroring the existing `reranker` flag and rendered into the `/v1/models` capabilities map, because capability discovery reads llama-server `/props` which reports nothing about embeddings, so a probed embed model surfaced as plain text->text and clients and the UI could only pick them out by name prefix by [@noctrex](https://github.com/noctrex)
+- [PR #1276](https://github.com/mostlygeek/llama-swap/pull/1276) feat(ui): group Models list into capability-derived class sections: derives each model's class (Chat, Image, Video, Audio, Embeddings, Rerank) client-side from the capability flags and modality lists `/v1/models` already carries and renders one collapsible section per class with a status dot that aggregates its rows, because a long flat list is hard to scan once many models are configured; `/api/events` modelStatus now includes `modalities: {in, out}` from the same `renderCapabilities` call so the dashboard and the OpenAI listing cannot disagree by [@noctrex](https://github.com/noctrex)
+- [PR #1279](https://github.com/mostlygeek/llama-swap/pull/1279) ui: move Models display options into a dropdown menu: moves the Categories and Show unlisted models switches into a "Display options" menu pinned to the right of the Models header (with the unlisted count shown in the item) and drops `flex-wrap`, because the header added in #1276 wrapped onto extra rows and made the page too tall; mobile layout improved too by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1280](https://github.com/mostlygeek/llama-swap/pull/1280) Makefile: add native target for the host platform: makes `native` the default target so a bare `make` builds for the platform you are on instead of cross-compiling everything, and fixes `make all` to actually cover Windows and FreeBSD, with `$(LDFLAGS)` factored out and shared by every platform target by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1282](https://github.com/mostlygeek/llama-swap/pull/1282) internal/capcompat: detect context length from yamz servers: reads `max_context` from `/v1/models` (tried after `context_length`) so yamz (kyojin) servers report their context length through the default prober by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1285](https://github.com/mostlygeek/llama-swap/pull/1285) ui: export the activity table as a client-side PNG image: rasterizes the visible table in the browser with html-to-image (SVG foreignObject -> canvas) and adds Markdown / Screenshot tabs to the export dialog with clipboard copy, download and a background resolved from the nearest opaque ancestor, so exporting works without a new backend endpoint; Meta and Capture columns are excluded from the render (#1284) by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1287](https://github.com/mostlygeek/llama-swap/pull/1287) ui: make markdown code highlighting theme aware in light mode: drives highlight.js token colors from `--hljs-*` custom properties (with a per-theme `--link` color and a lighter `--muted` for Midnight Commander) instead of one globally imported dark-only stylesheet, because code was measured at 1.12-1.40:1 contrast and was effectively invisible in all 11 light themes; light-mode code contrast is now 10.76-13.35:1 with dark mode unchanged by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1290](https://github.com/mostlygeek/llama-swap/pull/1290) internal/capcompat: read /props fields with gjson: extracts each `/props` field individually with gjson, so one unexpected field no longer takes the whole probe down, because llama-server b12017 added a list to `chat_template_caps` alongside its booleans which broke the whole-body unmarshal and made capability discovery fail against those builds; bad fields now log a WARN and read as their zero value (#1281) by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1292](https://github.com/mostlygeek/llama-swap/pull/1292) Extract usage parsing into pluggable upstream-specific handlers: splits usage extraction into per-upstream extractors (llama-server, vLLM, Anthropic, OpenAI, TabbyAPI, oMLX and an "auto" fallback that reads every known format) fed by the new `internal/hint` package which carries upstream and task information through the request context, and records task type, route, peer and reasoning tokens in the activity log, so token counts and performance metrics are accurate per upstream instead of assuming one format by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1293](https://github.com/mostlygeek/llama-swap/pull/1293) ui: fix the Model page Logs panel scrolling the whole page: gives the page its own scroll container and a minimum height for the Activity/Logs tabs, so a long log scrolls inside the panel instead of pushing the whole page by [@mostlygeek](https://github.com/mostlygeek)
+- [PR #1294](https://github.com/mostlygeek/llama-swap/pull/1294) Store request/response captures in separate SQLite database: moves captures out of the in-memory `internal/cache` into a capture repository backed by its own SQLite database (new `store.persistCaptures`, `captureBuffer` unchanged), so captures can persist across restarts without fragmenting the metrics db, are pruned asynchronously by compressed size and are addressed by a `yymmddhh-xxxx` capture id that activity rows link to; `internal/cache` is removed (#1115) by [@mostlygeek](https://github.com/mostlygeek)
+
 ## v268 (Oct 28, 2026)
 
 Many users run llama-swap on their gaming machines. The new Pause and Resume
