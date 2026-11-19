@@ -268,6 +268,7 @@
   let filterOpen = $state($storedFilterOpen);
 
   let selectedCapture = $state<ReqRespCapture | null>(null);
+  let selectedActivity = $state<ActivityLogEntry | null>(null);
   let dialogOpen = $state(false);
   let exportOpen = $state(false);
   let exportMarkdown = $state("");
@@ -276,16 +277,23 @@
   let cancelingInflightIds = $state<string[]>([]);
   let inflightNowMs = $state(performance.now());
 
+  // Only run the clock while the in-flight card is open.
   $effect(() => {
-    if (inflightRequests.length === 0) return;
+    if (!inflightOpen || inflightRequests.length === 0) return;
 
     // Refresh synchronously when the first request appears so the initial
     // render does not use the timestamp from when this component mounted.
+    let last = performance.now();
     inflightNowMs = performance.now();
 
+    // Throttle to 125ms; the elapsed time doesn't need updating every frame.
     let frame = 0;
     const tick = () => {
-      inflightNowMs = performance.now();
+      const now = performance.now();
+      if (now - last >= 125) {
+        last = now;
+        inflightNowMs = now;
+      }
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -293,11 +301,14 @@
     return () => cancelAnimationFrame(frame);
   });
 
-  async function viewCapture(id: number, captureId: string | undefined) {
-    if (!captureId) return;
-    loadingCaptureId = id;
-    const capture = await getCapture(captureId);
+  async function viewCapture(entry: ActivityLogEntry) {
+    if (!entry.capture_id) return;
+    loadingCaptureId = entry.id;
+    const capture = await getCapture(entry.capture_id);
     loadingCaptureId = null;
+    // The dialog's Summary tab reads the activity record; keep the row that was
+    // clicked rather than re-looking it up, since rows refresh underneath.
+    selectedActivity = entry;
     selectedCapture = capture;
     dialogOpen = true;
   }
@@ -305,6 +316,7 @@
   function closeDialog() {
     dialogOpen = false;
     selectedCapture = null;
+    selectedActivity = null;
   }
 
   // Built on demand rather than in a $derived: the source only matters while
@@ -480,7 +492,7 @@
           renderComponent(ViewCaptureButton, {
             hasCapture: row.original.has_capture,
             loading: loadingCaptureId === row.original.id,
-            onclick: () => viewCapture(row.original.id, row.original.capture_id),
+            onclick: () => viewCapture(row.original),
           }),
       },
       {
@@ -1038,7 +1050,12 @@
   </Card.Content>
 </Card.Root>
 
-<CaptureDialog capture={selectedCapture} open={dialogOpen} onclose={closeDialog} />
+<CaptureDialog
+  capture={selectedCapture}
+  activity={selectedActivity}
+  open={dialogOpen}
+  onclose={closeDialog}
+/>
 
 <ExportDialog
   markdown={exportMarkdown}

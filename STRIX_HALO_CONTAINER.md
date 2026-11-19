@@ -27,8 +27,9 @@ to reduce merge conflicts.
 
 ## Build locally
 
-The shared unified build script still defaults to upstream llama.cpp so it
-remains reusable after upstream syncs. Select the Strix Halo source explicitly:
+The shared unified build script still defaults to upstream's llama.cpp source
+(`mostlygeek/mg-llama.cpp`) so it remains reusable after upstream syncs. Select
+the Strix Halo source explicitly:
 
 ```bash
 LLAMA_REPO=https://github.com/halo-box/strix-llama.cpp.git \
@@ -42,6 +43,13 @@ provided by the fork's Vulkan sources and selected for the GPU/driver at
 runtime.
 
 ## Registry retention
+
+CI publishes to three packages: the image itself, `llama-halo-swap-build`
+(builder bases and per-project artifacts), and `llama-halo-swap-ccache`
+(per-project compiler caches that seed the next build). The last two are set by
+`ARTIFACT_REPO` and `CCACHE_REPO` in
+`.github/workflows/unified-docker-backend.yml`; without them the build script
+would target upstream's `mostlygeek` packages.
 
 `.github/workflows/strix-halo-container-cleanup.yml` runs every Sunday and
 removes images older than 60 days from both the published image package and the

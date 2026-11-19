@@ -185,7 +185,8 @@ var modelGetRoutes = []string{
 	"/sdapi/v1/loras",
 	"/props",
 
-	// websocket upgrade, OpenAI Realtime API style (?model=...)
+	// websocket upgrade, OpenAI Realtime API style (?model=..., or the
+	// model named by the first session.update event)
 	"/v1/realtime",
 }
 
@@ -433,7 +434,17 @@ func (s *Server) routes() {
 		mux.Handle("POST "+path, modelChain.Then(dispatch))
 	}
 	for _, path := range modelGetRoutes {
-		mux.Handle("GET "+path, modelChain.Then(dispatch))
+		h := modelChain.Then(dispatch)
+		switch path {
+		case "/v1/realtime":
+			// Realtime transcription clients name the model in a
+			// session.update event rather than the URL; see realtime_defer.go.
+			h = deferRealtimeModel(authMW, h)
+		case "/props":
+			// autoload=false must not start the model; see props.go.
+			h = modelChain.ThenFunc(s.handleProps)
+		}
+		mux.Handle("GET "+path, h)
 	}
 
 	// llama-swap API + custom endpoints.
