@@ -51,8 +51,9 @@ CI publishes to three packages: the image itself, `llama-halo-swap-build`
 `.github/workflows/unified-docker-backend.yml`; without them the build script
 would target upstream's `mostlygeek` packages.
 
-`.github/workflows/strix-halo-container-cleanup.yml` runs every Sunday and
-removes images older than 60 days from both the published image package and the
-content-addressed build-artifact package. The moving `unified-vulkan`, rootless,
-and amd64 tags are always preserved. A manual run defaults to dry-run mode so
+`.github/workflows/strix-halo-container-cleanup.yml` runs every Sunday. It
+removes images older than 60 days from the published image package and the
+build-artifact package, and deletes every untagged (superseded) compiler cache.
+The current cache tag for each project is kept so the next build stays warm.
+The moving `unified-vulkan`, rootless, and amd64 tags are always preserved. A manual run defaults to dry-run mode so
 its deletion plan can be reviewed first; scheduled runs perform the cleanup.
