@@ -10,6 +10,7 @@ FROM ${BUILDER_BASE} AS compile
 ARG BACKEND=cuda
 ARG LLAMA_COMMIT_HASH=master
 ARG LLAMA_REPO=https://github.com/mostlygeek/mg-llama.cpp.git
+ARG LLAMA_CMAKE_ARGS=
 ARG COMPILE_TIMEOUT_MINUTES=
 ARG CCACHE_EXPORT=
 COPY ccache-build.sh install-llama.sh /build/
@@ -17,7 +18,8 @@ RUN --mount=type=bind,from=ccache-seed,target=/ccache-seed \
     --mount=type=cache,id=ccache-${BACKEND},target=/ccache \
     --mount=type=cache,id=llama-${BACKEND},target=/src/llama.cpp/build \
     COMPILE_TIMEOUT_MINUTES=${COMPILE_TIMEOUT_MINUTES} CCACHE_EXPORT=${CCACHE_EXPORT} \
-    LLAMA_REPO=${LLAMA_REPO} BACKEND=${BACKEND} bash /build/ccache-build.sh run bash /build/install-llama.sh "${LLAMA_COMMIT_HASH}"
+    LLAMA_REPO=${LLAMA_REPO} LLAMA_CMAKE_ARGS="${LLAMA_CMAKE_ARGS}" \
+    BACKEND=${BACKEND} bash /build/ccache-build.sh run bash /build/install-llama.sh "${LLAMA_COMMIT_HASH}"
 
 # The compiler cache, published by build-image.sh --stage for the next run.
 FROM scratch AS ccache

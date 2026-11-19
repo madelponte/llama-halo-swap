@@ -49,6 +49,13 @@ elif [ "$BACKEND" = "vulkan" ]; then
     )
 fi
 
+# Extra cmake flags from the caller, split on whitespace, so a downstream
+# image can adjust its llama.cpp fork's options without editing this script.
+if [ -n "${LLAMA_CMAKE_ARGS:-}" ]; then
+    read -r -a EXTRA_CMAKE_FLAGS <<< "${LLAMA_CMAKE_ARGS}"
+    CMAKE_FLAGS+=("${EXTRA_CMAKE_FLAGS[@]}")
+fi
+
 TARGETS=(llama-cli llama-server llama-tts llama-bench)
 
 rm -rf build/CMakeCache.txt build/CMakeFiles 2>/dev/null || true

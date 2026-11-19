@@ -65,6 +65,7 @@ STAGE_TARGET=""
 PUSH=false
 WHISPER_FFMPEG="${WHISPER_FFMPEG:-yes}"
 INCLUDE_IK_LLAMA="${INCLUDE_IK_LLAMA:-true}"
+LLAMA_CMAKE_ARGS="${LLAMA_CMAKE_ARGS:-}"
 
 # Platform to build for. Empty means the host's own architecture, which is what
 # a local build wants; CI sets it explicitly and schedules the job on a runner
@@ -153,6 +154,7 @@ for arg in "$@"; do
             echo "  DOCKER_IMAGE_TAG     Set custom image tag (default: llama-swap:unified-<variant>,"
             echo "                       e.g. llama-swap:unified-cuda13)"
             echo "  LLAMA_REPO           Override the llama.cpp git repository URL"
+            echo "  LLAMA_CMAKE_ARGS     Extra cmake flags for llama.cpp (default: none)"
             echo "  LLAMA_REF            Pin llama.cpp to a commit, tag, or branch"
             echo "                       (default: master of"
             echo "                       https://github.com/mostlygeek/mg-llama.cpp)"
@@ -433,6 +435,7 @@ artifact_tag() {
         echo "base=$(base_tag)"
         if [[ "${project}" == "llama" ]]; then
             echo "LLAMA_REPO=${LLAMA_REPO}"
+            echo "LLAMA_CMAKE_ARGS=${LLAMA_CMAKE_ARGS}"
         fi
         echo "WHISPER_FFMPEG=${WHISPER_FFMPEG}"
         # Only ik_llama.cpp reads it, so only its tag moves when it changes.
@@ -696,6 +699,7 @@ build_project() {
         --build-arg "AUDIO_COMMIT_HASH=${AUDIO_HASH}" \
         --build-arg "LLAMA_COMMIT_HASH=${LLAMA_HASH}" \
         --build-arg "LLAMA_REPO=${LLAMA_REPO}" \
+        --build-arg "LLAMA_CMAKE_ARGS=${LLAMA_CMAKE_ARGS}" \
         --build-arg "IK_LLAMA_COMMIT_HASH=${IK_LLAMA_HASH}" \
         --build-arg "IK_CUDA_ARCHITECTURES=${IK_CUDA_ARCHITECTURES}" \
         "${PLATFORM_ARGS[@]}" \

@@ -19,6 +19,14 @@ The scheduled workflow resolves every moving ref to a commit before building,
 then publishes the image and its date-qualified tag. `/versions.txt` in the
 image records both the strix-llama.cpp repository and exact commit.
 
+`llama-server` is built without its embedded web UI
+(`-DLLAMA_USE_PREBUILT_UI=OFF`, set through `LLAMA_CMAKE_ARGS` in
+`.github/workflows/unified-docker-backend.yml`). Otherwise strix-llama.cpp
+downloads ggml-org's `latest` prebuilt UI, which can change its file layout
+before the fork's asset check catches up, failing the build. llama-swap's own UI
+and the `llama-server` API are unaffected; only the chat page `llama-server`
+serves itself (e.g. at `/upstream/<model>/`) is absent.
+
 CUDA variants are hard-disabled in `.github/workflows/unified-docker.yml`. The
 legacy workflow in `.github/workflows/containers.yml` is also skipped outside
 the upstream `mostlygeek/llama-swap` repository. This avoids paying to build or
@@ -34,6 +42,7 @@ the Strix Halo source explicitly:
 ```bash
 LLAMA_REPO=https://github.com/halo-box/strix-llama.cpp.git \
 INCLUDE_IK_LLAMA=false \
+LLAMA_CMAKE_ARGS=-DLLAMA_USE_PREBUILT_UI=OFF \
   ./docker/unified/build-image.sh --vulkan
 ```
 

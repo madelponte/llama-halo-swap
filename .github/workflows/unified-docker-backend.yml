@@ -68,6 +68,10 @@ env:
   ARTIFACT_REPO: ghcr.io/${{ github.repository }}-build
   CCACHE_REPO: ghcr.io/${{ github.repository }}-ccache
   INCLUDE_IK_LLAMA: "false"
+  # strix-llama.cpp would download llama-server's prebuilt web UI from
+  # ggml-org's "latest" build, whose file layout can run ahead of the fork's
+  # asset check and fail the build. Ship llama-server without its own UI.
+  LLAMA_CMAKE_ARGS: "-DLLAMA_USE_PREBUILT_UI=OFF"
 
 # Every stage runs natively on a runner of the target architecture. Compiling
 # CUDA through QEMU is not practical for builds that already take hours, so the
